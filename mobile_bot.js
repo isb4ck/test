@@ -1,7 +1,6 @@
 // Mobile SEO Bot - Sequential Processing
-const axios = require('axios');
-const cheerio = require('cheerio');
 const WebSocket = require('ws');
+const puppeteer = require('puppeteer');
 const { rotateMobileData, getCurrentMobileIP } = require('./mobile_rotation');
 
 // Configuration
@@ -44,104 +43,79 @@ function sendLogToDashboard(message, logType = 'info', ip = null) {
     });
 }
 
-// HTTP-only Google arama
-async function searchGoogleHTTP(keyword) {
+// Puppeteer ile Google Arama
+async function performGoogleSearch(keyword) {
+    let browser = null;
     try {
         const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}`;
-        console.log(`🔍 HTTP Google arama: "${keyword}"`);
-        sendLogToDashboard(`🔍 HTTP Google arama: "${keyword}"`, 'info', currentIP);
-        
-        const response = await axios.get(searchUrl, {
-            timeout: 30000,
-            maxRedirects: 5,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 11; SM-A515F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Upgrade-Insecure-Requests': '1'
-            }
+        sendLogToDashboard(`🔍 Puppeteer Google arama: "${keyword}"`, 'info', currentIP);
+
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36');
         
-        // HTML sayfasını kaydet (debug için)
-        const fs = require('fs');
-        const htmlFile = `google_search_${Date.now()}.html`;
-        fs.writeFileSync(htmlFile, response.data);
-        console.log(`💾 HTML kaydedildi: ${htmlFile}`);
-        sendLogToDashboard(`💾 HTML kaydedildi: ${htmlFile}`, 'info', currentIP);
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         
-        const $ = cheerio.load(response.data);
         const siteDomain = new URL(TARGET_URL).hostname.replace('www.', '');
-        
-        console.log(`🔍 Aranan domain: ${siteDomain}`);
         sendLogToDashboard(`🔍 Aranan domain: ${siteDomain}`, 'info', currentIP);
         
-        // Sayfa başlığını kontrol et
-        const pageTitle = $('title').text();
-        console.log(`📝 Sayfa başlığı: ${pageTitle}`);
+        const pageTitle = await page.title();
         sendLogToDashboard(`📝 Sayfa: ${pageTitle}`, 'info', currentIP);
-        
-        // APK BOT MANTIGI: Tüm linkleri kontrol et
-        let linkCount = 0;
-        let found = false;
-        let targetLinks = [];
-        
-        $('a').each((i, element) => {
-            const href = $(element).attr('href');
-            if (href) {
-                linkCount++;
-                
-                // APK bot gibi: Google ve Google servislerini atla
-                if (href.includes(siteDomain) && 
-                    !href.includes('google.com') && 
-                    !href.includes('googleusercontent.com') &&
-                    !href.includes('youtube.com') &&
-                    !href.includes('facebook.com') &&
-                    !href.includes('instagram.com') &&
-                    !href.includes('twitter.com')) {
-                    
-                    targetLinks.push(href);
-                    console.log(`🎯 HEDEF BULUNDU: ${href}`);
-                    sendLogToDashboard(`🎯 Hedef bulundu: ${href}`, 'success', currentIP);
-                    found = true;
+
+        // Hedef siteyi bulmak için daha gelişmiş mantık
+        const targetLink = await page.evaluate((domain) => {
+            // Tüm linkleri ve içerdikleri metinleri al
+            const links = Array.from(document.querySelectorAll('a'));
+            for (const link of links) {
+                // Linkin URL'si veya görünen metni domain'i içeriyorsa
+                if (link.href.includes(domain)) {
+                     // Google'ın yönlendirme linklerini atla, doğrudan siteye gideni bul
+                    if (!link.href.includes('google.com')) {
+                        return link.href;
+                    }
+                }
+                // Başlık (h3) içindeki metni kontrol et
+                const h3 = link.querySelector('h3');
+                if (h3 && h3.innerText.toLowerCase().includes(domain.split('.')[0])) {
+                     if (!link.href.includes('google.com')) {
+                        return link.href;
+                    }
                 }
             }
-        });
-        
-        console.log(`📊 Toplam ${linkCount} link, ${targetLinks.length} hedef link bulundu`);
-        sendLogToDashboard(`📊 ${linkCount} link kontrol edildi, ${targetLinks.length} hedef bulundu`, 'info', currentIP);
-        
-        console.log(`📊 Toplam ${linkCount} link kontrol edildi`);
-        sendLogToDashboard(`📊 ${linkCount} link kontrol edildi`, 'info', currentIP);
-        
-        if (found) {
-            console.log(`✅ Site bulundu, hedef siteye gidiliyor...`);
-            // Hedef siteye HTTP isteği gönder
-            await axios.get(TARGET_URL, {
-                timeout: 10000,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-                    'Referer': searchUrl
-                }
-            });
-            
-            sendLogToDashboard(`✅ Hedef siteye HTTP isteği gönderildi`, 'success', currentIP);
-            return true;
-        } else {
-            console.log(`❌ ${siteDomain} hiçbir linkte bulunamadı`);
-            sendLogToDashboard(`❌ ${siteDomain} bulunamadı (${linkCount} link kontrol edildi)`, 'error', currentIP);
-            return false;
+            return null;
+        }, siteDomain);
+
+        let found = false;
+        if (targetLink) {
+            sendLogToDashboard(`🎯 Hedef bulundu: ${targetLink}`, 'success', currentIP);
+
+            await Promise.all([
+                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
+                page.goto(targetLink) // Doğrudan linke gitmek daha güvenilir
+            ]);
+
+            sendLogToDashboard(`✅ Hedef siteye gidildi: ${await page.title()}`, 'success', currentIP);
+            found = true;
         }
         
+        if (found) {
+            return true;
+        } else {
+            sendLogToDashboard(`❌ ${siteDomain} bulunamadı (${links.length} link kontrol edildi)`, 'error', currentIP);
+            return false;
+        }
+
     } catch (error) {
-        console.log(`❌ HTTP arama hatası: ${error.message}`);
-        sendLogToDashboard(`❌ HTTP arama hatası: ${error.message}`, 'error', currentIP);
+        console.error('Puppeteer error:', error); // Detaylı hata logu
+        sendLogToDashboard(`❌ Puppeteer arama hatası: ${error.message}`, 'error', currentIP);
         return false;
+    } finally {
+        if (browser) {
+            await browser.close();
+        }
     }
 }
 
@@ -177,8 +151,11 @@ async function generateMobileTraffic() {
     while (!connectionReady && attempts < maxAttempts) {
         attempts++;
         try {
-            // Basit bir HTTP isteği ile bağlantıyı test et
-            await axios.get('https://www.google.com', { timeout: 5000 });
+            // Puppeteer ile basit bir istek atarak bağlantıyı test et
+            const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+            const page = await browser.newPage();
+            await page.goto('https://www.google.com', { timeout: 10000 });
+            await browser.close();
             connectionReady = true;
             console.log(`✅ İnternet bağlantısı hazır (${attempts}. deneme)`);
             sendLogToDashboard(`✅ İnternet bağlantısı hazır`, 'success', currentIP);
@@ -217,7 +194,7 @@ async function generateMobileTraffic() {
         console.log(`🌐 Kullanılan IP: ${currentIP}`);
         
         const keyword = SEARCH_KEYWORDS[Math.floor(Math.random() * SEARCH_KEYWORDS.length)];
-        const visitSuccess = await searchGoogleHTTP(keyword);
+        const visitSuccess = await performGoogleSearch(keyword);
         
         if (visitSuccess) {
             successCount++;

@@ -55,15 +55,19 @@ async function searchGoogleHTTP(keyword) {
             timeout: 30000,
             maxRedirects: 5,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 11; SM-A515F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Accept-Encoding': 'gzip, deflate, br',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
+                'Connection': 'keep-alive',
+                'DNT': '1',
+                'Sec-Ch-Ua': '"Chromium";v="112", "Google Chrome";v="112", "Not:A-Brand";v="99"',
+                'Sec-Ch-Ua-Mobile': '?1',
+                'Sec-Ch-Ua-Platform': '"Android"',
                 'Sec-Fetch-Dest': 'document',
                 'Sec-Fetch-Mode': 'navigate',
                 'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
                 'Upgrade-Insecure-Requests': '1'
             }
         });

@@ -140,37 +140,21 @@ async function generateMobileTraffic() {
     
     await rotateMobileData(); // IP değiştir ve bekle
     
-    // İnternet bağlantısının tamamen kurulmasını bekle
+    // Basit bağlantı kontrolü
     console.log(`⏳ İnternet bağlantısı kontrol ediliyor...`);
     sendLogToDashboard(`⏳ İnternet bağlantısı bekleniyor...`, 'info', currentIP);
     
-    let connectionReady = false;
-    let attempts = 0;
-    const maxAttempts = 10;
-    
-    while (!connectionReady && attempts < maxAttempts) {
-        attempts++;
-        try {
-            // Puppeteer ile basit bir istek atarak bağlantıyı test et
-            const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-            const page = await browser.newPage();
-            await page.goto('https://www.google.com', { timeout: 10000 });
-            await browser.close();
-            connectionReady = true;
-            console.log(`✅ İnternet bağlantısı hazır (${attempts}. deneme)`);
-            sendLogToDashboard(`✅ İnternet bağlantısı hazır`, 'success', currentIP);
-        } catch (error) {
-            console.log(`⏳ Bağlantı bekleniyor... (${attempts}/${maxAttempts})`);
-            await new Promise(resolve => setTimeout(resolve, 3000)); // 3 saniye bekle
-        }
-    }
-    
-    if (!connectionReady) {
-        console.log(`❌ İnternet bağlantısı kurulamadı`);
+    // Sadece IP alabiliyorsak bağlantı var demektir
+    const testIP = await getCurrentMobileIP();
+    if (testIP === 'Unknown') {
+        console.log(`❌ İnternet bağlantısı yok`);
         sendLogToDashboard(`❌ İnternet bağlantısı kurulamadı`, 'error', currentIP);
         isProcessing = false;
         return;
     }
+    
+    console.log(`✅ İnternet bağlantısı hazır`);
+    sendLogToDashboard(`✅ İnternet bağlantısı hazır`, 'success', testIP);
     
     const newIP = await getCurrentMobileIP();
     console.log(`🌐 Yeni IP: ${newIP}`);

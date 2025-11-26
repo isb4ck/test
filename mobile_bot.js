@@ -1,6 +1,8 @@
 // Mobile SEO Bot - Sequential Processing
 const WebSocket = require('ws');
-const { firefox } = require('playwright');
+const { exec } = require('child_process');
+const util = require('util');
+const execAsync = util.promisify(exec);
 const { rotateMobileData, getCurrentMobileIP } = require('./mobile_rotation');
 
 // Configuration
@@ -43,76 +45,40 @@ function sendLogToDashboard(message, logType = 'info', ip = null) {
     });
 }
 
-// Playwright Firefox ile Google Arama
+// Curl ile Google Arama (Android uyumlu)
 async function performGoogleSearch(keyword) {
-    let browser = null;
     try {
         const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}`;
-        sendLogToDashboard(`🔍 Firefox Google arama: "${keyword}"`, 'info', currentIP);
-
-        browser = await firefox.launch({ headless: true });
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Mobile; rv:109.0) Gecko/109.0 Firefox/109.0');
-        
-        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        sendLogToDashboard(`🔍 Curl Google arama: "${keyword}"`, 'info', currentIP);
         
         const siteDomain = new URL(TARGET_URL).hostname.replace('www.', '');
         sendLogToDashboard(`🔍 Aranan domain: ${siteDomain}`, 'info', currentIP);
         
-        const pageTitle = await page.title();
-        sendLogToDashboard(`📝 Sayfa: ${pageTitle}`, 'info', currentIP);
-
-        // Hedef siteyi bulmak için daha gelişmiş mantık
-        const targetLink = await page.evaluate((domain) => {
-            // Tüm linkleri ve içerdikleri metinleri al
-            const links = Array.from(document.querySelectorAll('a'));
-            for (const link of links) {
-                // Linkin URL'si veya görünen metni domain'i içeriyorsa
-                if (link.href.includes(domain)) {
-                     // Google'ın yönlendirme linklerini atla, doğrudan siteye gideni bul
-                    if (!link.href.includes('google.com')) {
-                        return link.href;
-                    }
-                }
-                // Başlık (h3) içindeki metni kontrol et
-                const h3 = link.querySelector('h3');
-                if (h3 && h3.innerText.toLowerCase().includes(domain.split('.')[0])) {
-                     if (!link.href.includes('google.com')) {
-                        return link.href;
-                    }
-                }
-            }
-            return null;
-        }, siteDomain);
-
-        let found = false;
-        if (targetLink) {
-            sendLogToDashboard(`🎯 Hedef bulundu: ${targetLink}`, 'success', currentIP);
-            
-            await Promise.all([
-                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
-                page.goto(targetLink) // Doğrudan linke gitmek daha güvenilir
-            ]);
-
-            sendLogToDashboard(`✅ Hedef siteye gidildi: ${await page.title()}`, 'success', currentIP);
-            found = true;
-        }
+        // Curl ile Google'da arama yap
+        const curlCommand = `curl -s -A "Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36" "${searchUrl}"`;
+        const { stdout } = await execAsync(curlCommand);
         
-        if (found) {
+        // HTML içinde hedef domain'i ara
+        const domainFound = stdout.includes(siteDomain);
+        
+        if (domainFound) {
+            sendLogToDashboard(`🎯 Hedef bulundu: ${siteDomain}`, 'success', currentIP);
+            
+            // Hedef siteye direkt git
+            const visitCommand = `curl -s -A "Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36" "${TARGET_URL}"`;
+            await execAsync(visitCommand);
+            
+            sendLogToDashboard(`✅ Hedef siteye gidildi: ${TARGET_URL}`, 'success', currentIP);
             return true;
         } else {
-            sendLogToDashboard(`❌ ${siteDomain} bulunamadı (${links.length} link kontrol edildi)`, 'error', currentIP);
+            sendLogToDashboard(`❌ ${siteDomain} bulunamadı`, 'error', currentIP);
             return false;
         }
-
+        
     } catch (error) {
-        console.error('Firefox error:', error); // Detaylı hata logu
-        sendLogToDashboard(`❌ Firefox arama hatası: ${error.message}`, 'error', currentIP);
+        console.error('Curl error:', error);
+        sendLogToDashboard(`❌ Curl arama hatası: ${error.message}`, 'error', currentIP);
         return false;
-    } finally {
-        if (browser) {
-            await browser.close();
-        }
     }
 }
 

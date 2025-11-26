@@ -1,164 +1,347 @@
-const { exec } = require("child_process");
+// Mobile SEO Bot - Advanced Traffic Simulator
+const WebSocket = require('ws');
+const { exec } = require('child_process');
+const util = require('util');
+const execAsync = util.promisify(exec);
+const { rotateMobileData, getCurrentMobileIP } = require('./mobile_rotation');
 
-// === RANDOM HELPERS ===
-const delay = (ms) => new Promise((res) => setTimeout(res, ms));
-const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const choice = (arr) => arr[Math.floor(Math.random() * arr.length)];
+// ---------------- CONFIG ----------------
+let TARGET_URL = 'https://fedaiforklift.com';
+let SEARCH_KEYWORDS = ['kayseri forklift kiralama', 'forklift kiralama', 'iş makinesi kiralama'];
+let VISITS_PER_MINUTE = 8;
+let IP_ROTATION_INTERVAL = 3;
+let TOTAL_VISIT_LIMIT = 0;
+let DELAY_BETWEEN_VISITS = 60000 / VISITS_PER_MINUTE;
 
+// Statistics
+let visitCount = 0;
+let successCount = 0;
+let errorCount = 0;
+let startTime = Date.now();
+let botRunning = false;
+let currentIP = 'Unknown';
+let isProcessing = false;
 
-// === ANDROİD CİHAZ MODELLERİ ===
-const devices = [
-  "SM-S908B", "Pixel 7", "Redmi Note 11",
-  "OnePlus 9", "Samsung A52", "Pixel 6", "Xiaomi Mi 11", "Samsung S21"
+// WebSocket server
+let wss;
+try {
+    wss = new WebSocket.Server({ port: 8090 });
+    console.log('🌐 WebSocket Server: ws://localhost:8090');
+} catch (error) {
+    wss = new WebSocket.Server({ port: 8091 });
+    console.log('🌐 WebSocket Server: ws://localhost:8091');
+}
+
+// Utility
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Chrome Version Rotation
+const CHROME_VERSIONS = [
+    "117.0.5938.60",
+    "118.0.5993.70",
+    "120.0.6099.20",
+    "121.0.6200.10"
 ];
 
-// === HTTP HEADER SETLERİ ===
-const headerSets = [
-  { lang: "tr-TR", uaLang: "tr-TR" },
-  { lang: "en-US", uaLang: "en-US" },
-  { lang: "tr,en-US", uaLang: "tr-TR,en-US" },
-  { lang: "en-US,en", uaLang: "en-US,en" },
-  { lang: "tr,en", uaLang: "tr,en" }
+// DNS Rotation
+const DNS_LIST = ["8.8.8.8", "1.1.1.1", "9.9.9.9"];
+
+// Mobile App Traffic (Fake Requests)
+const APP_DOMAINS = [
+    "https://i.instagram.com/api/v1/users/",
+    "https://www.youtube.com/youtubei/v1/browse",
+    "https://web.whatsapp.com/check/",
+    "https://m.facebook.com/api/graphql/"
 ];
 
-// === REFERERLER ===
-const referers = [
-  "https://www.google.com/",
-  "https://www.youtube.com/",
-  "https://www.instagram.com/",
-  "https://www.facebook.com/",
-  "https://twitter.com/",
-  "https://www.tiktok.com/",
-  "https://news.google.com/"
-];
+// Behavior Modes
+const BEHAVIOR_MODES = ["normal", "wrong_search", "bounce", "no_click"];
 
-// === NOISE ACTIONS ===
-const noiseActions = ["search_only", "wrong_search", "google_only", "random_click"];
-
-const wrongSearchTerms = ["hava durumu", "yemek tarifi", "döviz kuru", "son dakika", "çikolatalı kek"];
-
-
-
-// === SHELL EXEC WRAPPER ===
-function sh(command) {
-  return new Promise((resolve) => {
-    exec(command, (error, stdout) => {
-      resolve(stdout || "");
+// Send log to dashboard
+function sendLogToDashboard(message, logType = 'info', ip = null) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+                type: 'log',
+                message: message,
+                logType: logType,
+                ip: ip || currentIP
+            }));
+        }
     });
-  });
 }
 
+// Mobile-like curl wrapper with signal noise + DNS rotation
+async function mobileCurl(url) {
+    const chrome = CHROME_VERSIONS[Math.floor(Math.random() * CHROME_VERSIONS.length)];
+    const dns = DNS_LIST[Math.floor(Math.random() * DNS_LIST.length)];
+    const maxTime = Math.floor(Math.random() * 6) + 4; // 4–10s timeout
 
+    const ua = `Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 Chrome/${chrome} Mobile Safari/537.36`;
 
-// === GOOGLE SEARCH CRAWLER ===
-async function googleSearch(keyword, device, headerSet, referer) {
-  const url = `https://www.google.com/search?q=${encodeURIComponent(keyword)}`;
+    const cmd = `curl -s --dns-servers ${dns} -A "${ua}" --max-time ${maxTime} "${url}"`;
 
-  const cmd = `
-    curl -s --http2 \
-     -A "Mozilla/5.0 (Linux; Android 12; ${device}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117 Mobile Safari/537.36" \
-     -H "Accept-Language: ${headerSet.lang}" \
-     -e "${referer}" \
-     "${url}"
-  `;
-
-  return await sh(cmd);
+    try {
+        const { stdout } = await execAsync(cmd);
+        return stdout;
+    } catch (error) {
+        sendLogToDashboard(`❌ Curl hatası: ${error.message}`, 'error');
+        return '';
+    }
 }
 
-
-
-// === CHECK DOMAIN IN SEARCH RESULTS ===
-function containsDomain(html, domain) {
-  return html.includes(domain);
+// Fake mobile app signals
+async function simulateAppTraffic() {
+    const url = APP_DOMAINS[Math.floor(Math.random() * APP_DOMAINS.length)];
+    await mobileCurl(url);
+    sendLogToDashboard(`📱 Mobil uygulama sinyali: ${url.split('/')[2]}`, 'info');
 }
 
-
-
-// === RANDOM NOISE ACTION LOGIC ===
-async function runNoiseAction() {
-  const act = choice(noiseActions);
-
-  console.log("🔸 Noise Action:", act);
-
-  if (act === "search_only") {
-    await googleSearch("hangi gün", choice(devices), choice(headerSets), choice(referers));
-  }
-
-  if (act === "wrong_search") {
-    await googleSearch(choice(wrongSearchTerms), choice(devices), choice(headerSets), choice(referers));
-  }
-
-  if (act === "google_only") {
-    await sh('curl -s https://www.google.com/');
-  }
-
-  if (act === "random_click") {
-    await sh('curl -s https://www.hurriyet.com.tr/');
-  }
+// Google Search Simulation
+async function performGoogleSearch(keyword) {
+    try {
+        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}`;
+        sendLogToDashboard(`🔍 Google arama: "${keyword}"`, 'info');
+        
+        const siteDomain = new URL(TARGET_URL).hostname.replace('www.', '');
+        
+        // SERP depth (page 1-3)
+        const depth = [0, 10, 20][Math.floor(Math.random() * 3)];
+        const searchWithDepth = `${searchUrl}&start=${depth}`;
+        
+        const html = await mobileCurl(searchWithDepth);
+        sendLogToDashboard(`📄 SERP sayfa ${depth/10 + 1} tarandı`, 'info');
+        
+        // Domain kontrolü
+        const domainVariations = [
+            siteDomain,
+            siteDomain.replace('.com.tr', ''),
+            siteDomain.replace('.com', ''),
+            TARGET_URL
+        ];
+        
+        let domainFound = false;
+        let foundVariation = '';
+        
+        for (const variation of domainVariations) {
+            if (html.toLowerCase().includes(variation.toLowerCase())) {
+                domainFound = true;
+                foundVariation = variation;
+                break;
+            }
+        }
+        
+        if (domainFound) {
+            sendLogToDashboard(`🎯 Hedef bulundu: ${foundVariation}`, 'success');
+            return true;
+        } else {
+            sendLogToDashboard(`❌ ${siteDomain} SERP'te bulunamadı`, 'error');
+            return false;
+        }
+        
+    } catch (error) {
+        sendLogToDashboard(`❌ Arama hatası: ${error.message}`, 'error');
+        return false;
+    }
 }
 
+// Main traffic generator
+async function generateMobileTraffic() {
+    if (!botRunning || isProcessing) return;
+    
+    isProcessing = true;
+    
+    if (TOTAL_VISIT_LIMIT > 0 && visitCount >= TOTAL_VISIT_LIMIT) {
+        console.log(`🏁 Ziyaret limiti ulaşıldı: ${TOTAL_VISIT_LIMIT}`);
+        stopBot();
+        isProcessing = false;
+        return;
+    }
+    
+    visitCount++;
+    sendLogToDashboard(`🚀 Yeni trafik başlıyor (#${visitCount})`, 'info');
+    
+    // IP Rotation
+    console.log(`🔄 IP rotasyonu başlatılıyor... (#${visitCount})`);
+    sendLogToDashboard(`🔄 Mobil veri rotasyonu (#${visitCount})`, 'info');
+    
+    await rotateMobileData();
+    await wait(2000);
+    
+    // Get new IP
+    const testIP = await getCurrentMobileIP();
+    if (testIP === 'Unknown') {
+        sendLogToDashboard(`❌ İnternet bağlantısı kurulamadı`, 'error');
+        isProcessing = false;
+        return;
+    }
+    
+    currentIP = testIP;
+    sendLogToDashboard(`🌐 Yeni IP: ${currentIP}`, 'success');
+    
+    // Simulate mobile app signals (Instagram/YouTube/WhatsApp)
+    if (Math.random() < 0.4) {
+        await simulateAppTraffic();
+    }
+    
+    const behavior = BEHAVIOR_MODES[Math.floor(Math.random() * BEHAVIOR_MODES.length)];
+    sendLogToDashboard(`🎭 Davranış modu: ${behavior}`, 'info');
+    
+    // İstatistikleri güncelle
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+                type: 'stats',
+                data: { visitCount, successCount, errorCount, botRunning: true }
+            }));
+        }
+    });
 
+    try {
+        // WRONG SEARCH (simulate human error)
+        if (behavior === "wrong_search") {
+            await mobileCurl("https://www.google.com/search?q=hava+durumu+ankara");
+            sendLogToDashboard(`🤷 Yanlış arama yapıldı: "hava durumu"`, 'warning');
+            errorCount++;
+            isProcessing = false;
+            return;
+        }
+        
+        // Normal search simulation
+        const keyword = SEARCH_KEYWORDS[Math.floor(Math.random() * SEARCH_KEYWORDS.length)];
+        const searchSuccess = await performGoogleSearch(keyword);
+        
+        // NO CLICK scenario (scroll but no click)
+        if (behavior === "no_click") {
+            sendLogToDashboard(`👀 Sadece SERP tarandı, tıklanmadı`, 'warning');
+            errorCount++;
+            isProcessing = false;
+            return;
+        }
+        
+        if (!searchSuccess) {
+            errorCount++;
+            sendLogToDashboard(`❌ Ziyaret #${visitCount} başarısız`, 'error');
+            isProcessing = false;
+            return;
+        }
+        
+        // Visit target URL
+        await mobileCurl(TARGET_URL);
+        sendLogToDashboard(`📲 Siteye giriş yapıldı: ${TARGET_URL}`, 'success');
+        
+        // Bounce behavior
+        if (behavior === "bounce") {
+            await wait(1000 + Math.random() * 2000);
+            sendLogToDashboard(`↩️ Hızlı çıkış (bounce) - 1-3 saniye`, 'warning');
+            errorCount++;
+            isProcessing = false;
+            return;
+        }
+        
+        // Normal stay 3–12 seconds (SEO Boost)
+        const dwellTime = 3000 + Math.random() * 9000;
+        await wait(dwellTime);
+        sendLogToDashboard(`⏳ Sitede ${Math.round(dwellTime/1000)} saniye kalındı`, 'success');
+        sendLogToDashboard(`🚀 SEO Boost: Dwell time optimized`, 'success');
+        
+        successCount++;
+        sendLogToDashboard(`✅ Ziyaret #${visitCount} başarılı`, 'success');
 
-// === MAIN VISIT FUNCTION ===
-async function runVisit(keyword, targetDomain) {
-  console.log("\n\n==============================");
-  console.log("📍 Yeni Görev Başladı:", keyword);
-
-  const device = choice(devices);
-  const headerSet = choice(headerSets);
-  const referer = choice(referers);
-
-  console.log("📱 Cihaz:", device);
-  console.log("🌐 Dil:", headerSet.lang);
-  console.log("🔗 Referer:", referer);
-
-  // %30 Noise Action
-  if (Math.random() < 0.3) {
-    await runNoiseAction();
-  }
-
-  // Random delay (düşünme süresi)
-  const think = rand(2000, 5000);
-  console.log("⏳ Düşünme süresi:", think / 1000, "sn");
-  await delay(think);
-
-  // Google Search
-  console.log("🔍 Google araması yapılıyor...");
-  const html = await googleSearch(keyword, device, headerSet, referer);
-
-  if (!html || html.length < 50) {
-    console.log("⚠️ Google sonuçları gelmedi, IP down olabilir.");
-    return;
-  }
-
-  if (!containsDomain(html, targetDomain)) {
-    console.log("❌ Hedef domain sonuçlarda bulunamadı.");
-    return;
-  }
-
-  console.log("✅ Hedef domain sonuçlarda bulundu → Ziyaret ediliyor...");
-
-  // Visit domain (dwell time simülasyonu)
-  await sh(`curl -s --http2 "${targetDomain}"`);
-
-  const stay = rand(5000, 15000);
-  console.log("⏳ Sitede kalma süresi:", stay / 1000, "sn");
-
-  await delay(stay);
-
-  console.log("🏁 Ziyaret tamamlandı.");
+    } catch (error) {
+        errorCount++;
+        console.log(`❌ Ziyaret #${visitCount} hatası: ${error.message}`);
+        sendLogToDashboard(`❌ Ziyaret hatası: ${error.message}`, 'error');
+    }
+    
+    isProcessing = false;
 }
 
-
-
-// === LOOP ===
-async function loop() {
-  while (true) {
-    await runVisit("forklift kiralama", "https://fedaiforklift.com");
-    const wait = rand(3000, 7000);
-    console.log("🔄 Yeni görev öncesi bekleme:", wait / 1000, "sn");
-    await delay(wait);
-  }
+// Bot loop
+async function runSequentialTraffic() {
+    while (botRunning) {
+        await generateMobileTraffic();
+        
+        if (botRunning) {
+            const randomDelay = DELAY_BETWEEN_VISITS + (Math.random() * 10000);
+            console.log(`⏱️ ${Math.round(randomDelay/1000)} saniye bekleniyor...`);
+            await wait(randomDelay);
+        }
+    }
 }
 
-loop();
+// Bot kontrol fonksiyonları
+function startBot() {
+    if (botRunning) return;
+    
+    botRunning = true;
+    startTime = Date.now();
+    visitCount = 0;
+    successCount = 0;
+    errorCount = 0;
+    
+    console.log('📱 Advanced Mobile SEO Bot başlatıldı');
+    sendLogToDashboard('📱 Advanced Mobile SEO Bot başlatıldı', 'success');
+    
+    runSequentialTraffic();
+}
+
+function stopBot() {
+    if (!botRunning) return;
+    
+    botRunning = false;
+    
+    console.log('🛑 Mobile SEO Bot durduruldu');
+    sendLogToDashboard('🛑 Mobile SEO Bot durduruldu', 'error');
+    
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({
+                type: 'stats',
+                data: { visitCount, successCount, errorCount, botRunning: false }
+            }));
+        }
+    });
+}
+
+// WebSocket bağlantı yöneticisi
+wss.on('connection', (ws) => {
+    console.log('📱 Mobile Dashboard bağlandı');
+    
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+            
+            switch (data.action) {
+                case 'start':
+                    startBot();
+                    break;
+                case 'stop':
+                    stopBot();
+                    break;
+                case 'config':
+                    TARGET_URL = data.targetUrl || TARGET_URL;
+                    SEARCH_KEYWORDS = data.keywords || SEARCH_KEYWORDS;
+                    VISITS_PER_MINUTE = data.visitsPerMinute || VISITS_PER_MINUTE;
+                    IP_ROTATION_INTERVAL = data.ipRotation || IP_ROTATION_INTERVAL;
+                    TOTAL_VISIT_LIMIT = data.totalVisitLimit || 0;
+                    DELAY_BETWEEN_VISITS = 60000 / VISITS_PER_MINUTE;
+                    console.log(`⚙️ Bot ayarları güncellendi`);
+                    break;
+            }
+            
+            ws.send(JSON.stringify({
+                type: 'stats',
+                data: { visitCount, successCount, errorCount, botRunning }
+            }));
+            
+        } catch (error) {
+            console.log('❌ WebSocket hatası:', error.message);
+        }
+    });
+});
+
+console.log('📱 Advanced Mobile SEO Bot - Ready');
+console.log('🔄 Mobil veri rotasyonu + DNS rotasyonu aktif');
+console.log('📱 Dashboard: mobile_dashboard.html');
+console.log('✅ Bot hazır...');

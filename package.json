@@ -8,7 +8,7 @@
     "test": "node -e \"console.log('Mobile SEO Bot Test')\""
   },
   "dependencies": {
-    "puppeteer": "^24.31.0",
+    "playwright": "^1.40.0",
     "ws": "^8.14.2"
   },
   "keywords": [

@@ -2,12 +2,12 @@ const { exec } = require('child_process');
 const util = require('util');
 const execAsync = util.promisify(exec);
 
-// Windows için uçak modu kontrolü
+// ADB ile uçak modu kontrolü (Rootlu Android)
 async function toggleAirplaneMode(enable) {
     try {
         const command = enable 
-            ? 'powershell -Command "Get-NetAdapter | Disable-NetAdapter -Confirm:$false"'
-            : 'powershell -Command "Get-NetAdapter | Enable-NetAdapter -Confirm:$false"';
+            ? 'adb shell settings put global airplane_mode_on 1 && adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true'
+            : 'adb shell settings put global airplane_mode_on 0 && adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false';
         
         await execAsync(command);
         console.log(`✈️ Uçak modu ${enable ? 'açıldı' : 'kapatıldı'}`);
@@ -36,7 +36,7 @@ async function rotateMobileData() {
         await toggleAirplaneMode(false);
         
         // 4. Bağlantının kurulmasını bekle
-        console.log('⏳ Bağlantı kurulması bekleniyor...');
+        console.log('⏳ Mobil veri bağlantısı bekleniyor...');
         await new Promise(resolve => setTimeout(resolve, 10000));
         
         console.log('✅ Mobil veri rotasyonu tamamlandı');
@@ -51,10 +51,10 @@ async function rotateMobileData() {
 // Mevcut IP adresini al
 async function getCurrentMobileIP() {
     try {
-        const { stdout } = await execAsync('powershell -Command "(Invoke-WebRequest -Uri "https://api.ipify.org" -UseBasicParsing).Content"');
+        const { stdout } = await execAsync('curl -s https://api.ipify.org');
         const ip = stdout.trim();
         console.log(`🌐 Mevcut IP: ${ip}`);
-        return ip;
+        return ip || 'Bilinmiyor';
     } catch (error) {
         console.error('❌ IP alma hatası:', error.message);
         return 'Bilinmiyor';

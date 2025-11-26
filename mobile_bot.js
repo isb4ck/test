@@ -58,11 +58,30 @@ async function performGoogleSearch(keyword) {
         const curlCommand = `curl -s -A "Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36" "${searchUrl}"`;
         const { stdout } = await execAsync(curlCommand);
         
-        // HTML içinde hedef domain'i ara
-        const domainFound = stdout.includes(siteDomain);
+        // Debug: HTML içeriğini kontrol et
+        sendLogToDashboard(`🔍 HTML boyutu: ${stdout.length} karakter`, 'info', currentIP);
+        
+        // Çoklu domain kontrolü
+        const domainVariations = [
+            siteDomain,
+            siteDomain.replace('.com.tr', ''),
+            siteDomain.replace('.com', ''),
+            TARGET_URL
+        ];
+        
+        let domainFound = false;
+        let foundVariation = '';
+        
+        for (const variation of domainVariations) {
+            if (stdout.toLowerCase().includes(variation.toLowerCase())) {
+                domainFound = true;
+                foundVariation = variation;
+                break;
+            }
+        }
         
         if (domainFound) {
-            sendLogToDashboard(`🎯 Hedef bulundu: ${siteDomain}`, 'success', currentIP);
+            sendLogToDashboard(`🎯 Hedef bulundu: ${foundVariation}`, 'success', currentIP);
             
             // Hedef siteye direkt git
             const visitCommand = `curl -s -A "Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36" "${TARGET_URL}"`;
@@ -71,6 +90,9 @@ async function performGoogleSearch(keyword) {
             sendLogToDashboard(`✅ Hedef siteye gidildi: ${TARGET_URL}`, 'success', currentIP);
             return true;
         } else {
+            // Debug: HTML'de ne var göster
+            const htmlPreview = stdout.substring(0, 500).replace(/[<>]/g, '');
+            sendLogToDashboard(`🔍 HTML örneği: ${htmlPreview}...`, 'info', currentIP);
             sendLogToDashboard(`❌ ${siteDomain} bulunamadı`, 'error', currentIP);
             return false;
         }

@@ -3,334 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📱 Mobile SEO Bot</title>
+    <title>Mobile SEO Bot Dashboard</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
-            min-height: 100vh;
-            padding: 10px;
-        }
-        
-        .container { max-width: 400px; margin: 0 auto; }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-        }
-        .header h1 { font-size: 1.5em; margin-bottom: 5px; }
-        .header p { font-size: 0.9em; opacity: 0.8; }
-        
-        .card {
-            background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 15px;
-            margin-bottom: 15px;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        
-        .form-group { margin-bottom: 15px; }
-        .form-group label { 
-            display: block; 
-            margin-bottom: 5px; 
-            font-weight: 600;
-            font-size: 0.9em;
-        }
-        .form-group input, .form-group textarea, .form-group select {
-            width: 100%;
-            padding: 12px;
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 10px;
-            color: #fff;
-            font-size: 16px;
-        }
-        .form-group input::placeholder, .form-group textarea::placeholder {
-            color: rgba(255,255,255,0.7);
-        }
-        
-        .btn {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-bottom: 10px;
-            transition: all 0.3s;
-        }
-        .btn-start { background: #4CAF50; color: white; }
-        .btn-stop { background: #f44336; color: white; }
-        .btn-start:active { background: #45a049; }
-        .btn-stop:active { background: #da190b; }
-        
-        .stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        .stat-card {
-            background: rgba(255,255,255,0.2);
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        .stat-card .number { font-size: 1.5em; font-weight: bold; }
-        .stat-card .label { font-size: 0.8em; opacity: 0.8; }
-        
-        .status {
-            text-align: center;
-            padding: 10px;
-            border-radius: 10px;
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
-        .status.running { background: #4CAF50; }
-        .status.stopped { background: #f44336; }
-        
-        .logs {
-            background: rgba(0,0,0,0.3);
-            border-radius: 10px;
-            padding: 15px;
-            height: 200px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.8em;
-        }
-        .log-entry {
-            padding: 2px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .log-success { color: #4CAF50; }
-        .log-error { color: #f44336; }
-        .log-info { color: #2196F3; }
-        
-        .ip-display {
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 10px;
-            text-align: center;
-            font-family: monospace;
-            margin-bottom: 15px;
-        }
-        
-        .warning {
-            background: rgba(255,193,7,0.2);
-            border: 1px solid rgba(255,193,7,0.5);
-            padding: 10px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            font-size: 0.9em;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background-color: #1e1e1e; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        h1 { color: #bb86fc; text-align: center; }
+        .controls, .stats, .config { background-color: #2c2c2c; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        .controls button { background-color: #03dac6; color: #121212; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; margin-right: 10px; transition: background-color 0.3s; }
+        .controls button.stop { background-color: #cf6679; }
+        .controls button:hover { opacity: 0.9; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; text-align: center; }
+        .stat-item { background-color: #3e3e3e; padding: 15px; border-radius: 4px; }
+        .stat-item h3 { margin: 0 0 10px; color: #bb86fc; font-size: 14px; text-transform: uppercase; }
+        .stat-item p { margin: 0; font-size: 24px; font-weight: bold; }
+        .config input, .config textarea { width: 100%; padding: 8px; background-color: #3e3e3e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; margin-bottom: 10px; box-sizing: border-box; }
+        .config textarea { resize: vertical; min-height: 80px; }
+        .log-container { background-color: #2c2c2c; padding: 15px; border-radius: 6px; height: 300px; overflow-y: auto; font-family: "Courier New", Courier, monospace; font-size: 14px; line-height: 1.5; }
+        .log-entry { padding: 2px 5px; border-radius: 3px; margin-bottom: 5px; }
+        .log-entry.info { background-color: #3a3a3a; }
+        .log-entry.success { background-color: #2e7d32; }
+        .log-entry.error { background-color: #b71c1c; }
+        .status-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 10px; }
+        .status-indicator.running { background-color: #66bb6a; }
+        .status-indicator.stopped { background-color: #ef5350; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📱 Mobile SEO Bot</h1>
-            <p>HTTP-Only • Sıralı İşlem • Her Ziyarette IP Değişimi</p>
-        </div>
-
-        <div class="status stopped" id="status">DURDURULDU</div>
+        <h1>Mobile SEO Bot</h1>
         
-        <div class="ip-display">
-            <strong>Mevcut IP:</strong> <span id="currentIP">Bilinmiyor</span>
+        <div class="controls">
+            <button id="startButton">START</button>
+            <button id="stopButton" class="stop">STOP</button>
+            <span id="statusIndicator" class="status-indicator stopped"></span>
         </div>
-        
-        <div class="warning">
-            ⚠️ <strong>Sıralı İşlem:</strong> Her ziyaret öncesinde IP değişir, ziyaret tamamlanınca bir sonrakine geçer.
-        </div>
-
-        <div class="card">
-            <div class="form-group">
-                <label>🎯 Hedef Website:</label>
-                <input type="url" id="targetUrl" placeholder="https://example.com" value="https://fedaiforklift.com">
-            </div>
-            
-            <div class="form-group">
-                <label>🔍 Anahtar Kelimeler:</label>
-                <textarea id="keywords" rows="3" placeholder="kayseri forklift kiralama&#10;forklift kiralama&#10;iş makinesi">kayseri forklift kiralama
-forklift kiralama
-iş makinesi kiralama</textarea>
-            </div>
-            
-            <div class="form-group">
-                <label>🚀 Dakikada Ziyaret:</label>
-                <select id="visitsPerMinute">
-                    <option value="5">5 (Çok Güvenli)</option>
-                    <option value="10" selected>10 (Güvenli)</option>
-                    <option value="15">15 (Orta)</option>
-                    <option value="20">20 (Hızlı)</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label>🔄 IP Değiştirme:</label>
-                <select id="ipRotation" disabled>
-                    <option value="1" selected>Her ziyarette (Otomatik)</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label>🎯 Toplam Limit:</label>
-                <input type="number" id="totalLimit" placeholder="0 = Sınırsız" value="0">
-            </div>
-        </div>
-
-        <button class="btn btn-start" onclick="startBot()">▶️ Botu Başlat</button>
-        <button class="btn btn-stop" onclick="stopBot()">⏹️ Botu Durdur</button>
 
         <div class="stats">
-            <div class="stat-card">
-                <div class="number" id="totalVisits">0</div>
-                <div class="label">Toplam</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" id="successVisits">0</div>
-                <div class="label">Başarılı</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" id="errorVisits">0</div>
-                <div class="label">Hata</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" id="successRate">0%</div>
-                <div class="label">Başarı</div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <h3>Ziyaret Sayısı</h3>
+                    <p id="visitCount">0</p>
+                </div>
+                <div class="stat-item">
+                    <h3>Başarılı</h3>
+                    <p id="successCount">0</p>
+                </div>
+                <div class="stat-item">
+                    <h3>Hatalı</h3>
+                    <p id="errorCount">0</p>
+                </div>
             </div>
         </div>
 
-        <div class="card">
-            <h3 style="margin-bottom: 10px;">📋 Bot Logları</h3>
-            <div class="logs" id="logContainer"></div>
+        <div class="config">
+            <input type="text" id="targetUrl" placeholder="Hedef URL (örn: https://example.com)">
+            <textarea id="keywords" placeholder="Anahtar Kelimeler (her satıra bir tane)"></textarea>
+            <input type="number" id="visitsPerMinute" placeholder="Dakika Başına Ziyaret">
+            <input type="number" id="totalVisitLimit" placeholder="Toplam Ziyaret Limiti (0 = sonsuz)">
+            <button id="saveConfigButton">Ayarları Kaydet</button>
         </div>
+
+        <div class="log-container" id="logContainer"></div>
     </div>
 
     <script>
-        let botRunning = false;
-        let stats = { totalVisits: 0, successVisits: 0, errorVisits: 0 };
-        let ws = null;
+        const ws = new WebSocket(`ws://${window.location.hostname}:8090`);
 
-        function addLog(message, type = 'info', ip = null) {
-            const logContainer = document.getElementById('logContainer');
-            const logEntry = document.createElement('div');
-            logEntry.className = `log-entry log-${type}`;
-            const ipInfo = ip ? ` [${ip}]` : '';
-            logEntry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}${ipInfo}`;
-            logContainer.appendChild(logEntry);
+        const startButton = document.getElementById("startButton");
+        const stopButton = document.getElementById("stopButton");
+        const saveConfigButton = document.getElementById("saveConfigButton");
+        const logContainer = document.getElementById("logContainer");
+        
+        const visitCountEl = document.getElementById("visitCount");
+        const successCountEl = document.getElementById("successCount");
+        const errorCountEl = document.getElementById("errorCount");
+        const statusIndicator = document.getElementById("statusIndicator");
+
+        const targetUrlInput = document.getElementById("targetUrl");
+        const keywordsInput = document.getElementById("keywords");
+        const visitsPerMinuteInput = document.getElementById("visitsPerMinute");
+        const totalVisitLimitInput = document.getElementById("totalVisitLimit");
+
+        ws.onopen = () => {
+            addLog("WebSocket bağlantısı kuruldu.", "success");
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "log") {
+                addLog(data.message, data.logType, data.ip);
+            } else if (data.type === "stats") {
+                updateStats(data.data);
+            }
+        };
+
+        ws.onclose = () => {
+            addLog("WebSocket bağlantısı kapandı.", "error");
+            updateStatus(false);
+        };
+
+        ws.onerror = (error) => {
+            addLog("WebSocket hatası!", "error");
+            console.error("WebSocket Error:", error);
+        };
+
+        function addLog(message, type = "info", ip = null) {
+            const entry = document.createElement("div");
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `[${timestamp}] ${ip ? `[${ip}]` : ""} ${message}`;
+            logContainer.appendChild(entry);
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        function updateStats() {
-            document.getElementById('totalVisits').textContent = stats.totalVisits;
-            document.getElementById('successVisits').textContent = stats.successVisits;
-            document.getElementById('errorVisits').textContent = stats.errorVisits;
-            
-            const successRate = stats.totalVisits > 0 ? 
-                ((stats.successVisits / stats.totalVisits) * 100).toFixed(1) : 0;
-            document.getElementById('successRate').textContent = successRate + '%';
+        function updateStats(stats) {
+            visitCountEl.textContent = stats.visitCount;
+            successCountEl.textContent = stats.successCount;
+            errorCountEl.textContent = stats.errorCount;
+            updateStatus(stats.botRunning);
         }
 
-        function connectToBot() {
-            try {
-                ws = new WebSocket('ws://localhost:8090');
-                
-                ws.onopen = () => {
-                    addLog('✅ Bot bağlantısı kuruldu', 'success');
-                };
-                
-                ws.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'stats') {
-                        stats.totalVisits = data.data.visitCount || 0;
-                        stats.successVisits = data.data.successCount || 0;
-                        stats.errorVisits = data.data.errorCount || 0;
-                        updateStats();
-                        
-                        if (data.data.botRunning) {
-                            document.getElementById('status').textContent = 'ÇALIŞIYOR';
-                            document.getElementById('status').className = 'status running';
-                        } else {
-                            document.getElementById('status').textContent = 'DURDURULDU';
-                            document.getElementById('status').className = 'status stopped';
-                        }
-                    } else if (data.type === 'log') {
-                        addLog(data.message, data.logType, data.ip);
-                        
-                        if (data.ip && data.ip !== 'Unknown') {
-                            document.getElementById('currentIP').textContent = data.ip;
-                        }
-                    }
-                };
-                
-                ws.onclose = () => {
-                    addLog('❌ Bot bağlantısı kesildi', 'error');
-                    setTimeout(connectToBot, 3000);
-                };
-                
-            } catch (error) {
-                addLog(`❌ Bağlantı hatası: ${error.message}`, 'error');
-            }
-        }
-
-        function startBot() {
-            const targetUrl = document.getElementById('targetUrl').value;
-            const keywords = document.getElementById('keywords').value.split('\n').filter(k => k.trim());
-            const visitsPerMinute = parseInt(document.getElementById('visitsPerMinute').value);
-            const ipRotation = parseInt(document.getElementById('ipRotation').value);
-            const totalLimit = parseInt(document.getElementById('totalLimit').value) || 0;
-            
-            if (!targetUrl || keywords.length === 0) {
-                alert('Lütfen hedef URL ve anahtar kelimeleri girin!');
-                return;
-            }
-            
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    action: 'config',
-                    targetUrl: targetUrl,
-                    keywords: keywords,
-                    visitsPerMinute: visitsPerMinute,
-                    ipRotation: ipRotation,
-                    totalVisitLimit: totalLimit,
-                    botType: 'mobile',
-                    trafficMode: 'google'
-                }));
-                
-                ws.send(JSON.stringify({ action: 'start' }));
-                
-                addLog(`📱 Mobile SEO Bot başlatıldı (Sıralı)`, 'success');
-                addLog(`🎯 Hedef: ${targetUrl}`, 'info');
-                addLog(`🔍 ${keywords.length} anahtar kelime`, 'info');
-                addLog(`🚀 Hız: ${visitsPerMinute}/dakika`, 'info');
-                addLog(`🔄 IP değiştirme: Her ${ipRotation} ziyaret`, 'info');
-                addLog(`📱 HTTP-Only mod aktif`, 'info');
+        function updateStatus(isRunning) {
+            if (isRunning) {
+                statusIndicator.classList.remove("stopped");
+                statusIndicator.classList.add("running");
             } else {
-                alert('Bot bağlantısı yok! mobile_bot.js çalıştırın.');
+                statusIndicator.classList.remove("running");
+                statusIndicator.classList.add("stopped");
             }
         }
 
-        function stopBot() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ action: 'stop' }));
-                addLog('⏹️ Bot durduruldu', 'error');
-            }
-        }
+        startButton.addEventListener("click", () => {
+            ws.send(JSON.stringify({ action: "start" }));
+            addLog("Başlatma komutu gönderildi.", "info");
+        });
 
-        // Initialize
-        updateStats();
-        connectToBot();
-        addLog('📱 Mobile SEO Bot Dashboard hazır', 'success');
-        addLog('🔄 Sıralı işlem modu - Her ziyaret tamamlanmadan sonrakine geçmez', 'info');
-        addLog('📱 Bot bağlantısı kuruluyor...', 'info');
+        stopButton.addEventListener("click", () => {
+            ws.send(JSON.stringify({ action: "stop" }));
+            addLog("Durdurma komutu gönderildi.", "info");
+        });
+
+        saveConfigButton.addEventListener("click", () => {
+            const keywords = keywordsInput.value.split("\n").filter(k => k.trim() !== "");
+            const config = {
+                action: "config",
+                targetUrl: targetUrlInput.value,
+                keywords: keywords,
+                visitsPerMinute: parseInt(visitsPerMinuteInput.value, 10),
+                totalVisitLimit: parseInt(totalVisitLimitInput.value, 10)
+            };
+            ws.send(JSON.stringify(config));
+            addLog("Yeni ayarlar gönderildi.", "success");
+        });
+
     </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 // Mobile SEO Bot - Sequential Processing
 const WebSocket = require('ws');
-const puppeteer = require('puppeteer');
+const { firefox } = require('playwright');
 const { rotateMobileData, getCurrentMobileIP } = require('./mobile_rotation');
 
 // Configuration
@@ -43,19 +43,16 @@ function sendLogToDashboard(message, logType = 'info', ip = null) {
     });
 }
 
-// Puppeteer ile Google Arama
+// Playwright Firefox ile Google Arama
 async function performGoogleSearch(keyword) {
     let browser = null;
     try {
         const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}`;
-        sendLogToDashboard(`🔍 Puppeteer Google arama: "${keyword}"`, 'info', currentIP);
+        sendLogToDashboard(`🔍 Firefox Google arama: "${keyword}"`, 'info', currentIP);
 
-        browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
+        browser = await firefox.launch({ headless: true });
         const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36');
+        await page.setUserAgent('Mozilla/5.0 (Mobile; rv:109.0) Gecko/109.0 Firefox/109.0');
         
         await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         
@@ -109,8 +106,8 @@ async function performGoogleSearch(keyword) {
         }
 
     } catch (error) {
-        console.error('Puppeteer error:', error); // Detaylı hata logu
-        sendLogToDashboard(`❌ Puppeteer arama hatası: ${error.message}`, 'error', currentIP);
+        console.error('Firefox error:', error); // Detaylı hata logu
+        sendLogToDashboard(`❌ Firefox arama hatası: ${error.message}`, 'error', currentIP);
         return false;
     } finally {
         if (browser) {

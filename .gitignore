@@ -1,0 +1,15 @@
+# IDE files
+.idea/
+
+# Backup files
+*.original
+
+# Gradle cache
+.gradle/
+
+# Build outputs
+/app/build/
+
+# Other common ignored files
+*.iml
+local.properties
